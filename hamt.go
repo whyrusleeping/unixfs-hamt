@@ -165,19 +165,19 @@ func (ds *HamtShard) Label() string {
 
 func (ds *HamtShard) Insert(name string, nd *dag.Node) error {
 	hv := &hashBits{b: hash([]byte(name))}
-	return ds.modifyHash(hv, name, nd)
+	return ds.modifyValue(hv, name, nd)
 }
 
 func (ds *HamtShard) Remove(name string) error {
 	hv := &hashBits{b: hash([]byte(name))}
-	return ds.modifyHash(hv, name, nil)
+	return ds.modifyValue(hv, name, nil)
 }
 
 func (ds *HamtShard) Find(name string) (*dag.Node, error) {
 	hv := &hashBits{b: hash([]byte(name))}
 
 	var out *dag.Node
-	err := ds.consumeValue(hv, name, func(sv *shardValue) error {
+	err := ds.getValue(hv, name, func(sv *shardValue) error {
 		out = sv.val
 		return nil
 	})
@@ -259,7 +259,7 @@ func (ds *HamtShard) rmChild(i int) error {
 	return nil
 }
 
-func (ds *HamtShard) consumeValue(hv *hashBits, key string, cb func(*shardValue) error) error {
+func (ds *HamtShard) getValue(hv *hashBits, key string, cb func(*shardValue) error) error {
 	idx := hv.Next(ds.tableSizeLg2)
 	if ds.bitfield.Bit(int(idx)) == 1 {
 		cindex := ds.indexForBitPos(idx)
@@ -271,7 +271,7 @@ func (ds *HamtShard) consumeValue(hv *hashBits, key string, cb func(*shardValue)
 
 		switch child := child.(type) {
 		case *HamtShard:
-			return child.consumeValue(hv, key, cb)
+			return child.getValue(hv, key, cb)
 		case *shardValue:
 			if child.key == key {
 				return cb(child)
@@ -335,7 +335,7 @@ func (ds *HamtShard) walkTrie(cb func(*shardValue) error) error {
 	return nil
 }
 
-func (ds *HamtShard) modifyHash(hv *hashBits, key string, val *dag.Node) error {
+func (ds *HamtShard) modifyValue(hv *hashBits, key string, val *dag.Node) error {
 	idx := hv.Next(ds.tableSizeLg2)
 
 	if ds.bitfield.Bit(idx) == 1 {
@@ -348,7 +348,7 @@ func (ds *HamtShard) modifyHash(hv *hashBits, key string, val *dag.Node) error {
 
 		switch child := child.(type) {
 		case *HamtShard:
-			err := child.modifyHash(hv, key, val)
+			err := child.modifyValue(hv, key, val)
 			if err != nil {
 				return err
 			}
@@ -391,12 +391,12 @@ func (ds *HamtShard) modifyHash(hv *hashBits, key string, val *dag.Node) error {
 					consumed: hv.consumed,
 				}
 
-				err := ns.modifyHash(hv, key, val)
+				err := ns.modifyValue(hv, key, val)
 				if err != nil {
 					return err
 				}
 
-				err = ns.modifyHash(chhv, child.key, child.val)
+				err = ns.modifyValue(chhv, child.key, child.val)
 				if err != nil {
 					return err
 				}
