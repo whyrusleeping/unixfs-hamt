@@ -72,10 +72,15 @@ func NewHamtFromDag(dserv dag.DAGService, nd *dag.Node) (*HamtShard, error) {
 		return nil, fmt.Errorf("node was not a dir shard")
 	}
 
+	if pbd.GetHashType() != HashMurmur3 {
+		return nil, fmt.Errorf("only murmur3 supported as hash function")
+	}
+
 	ds := makeHamtShard(dserv, int(pbd.GetFanout()))
 	ds.nd = nd.Copy()
 	ds.children = make([]child, len(nd.Links))
 	ds.bitfield = new(big.Int).SetBytes(pbd.GetData())
+	ds.hashFunc = pbd.GetHashType()
 
 	return ds, nil
 }
@@ -84,6 +89,7 @@ func NewHamtFromDag(dserv dag.DAGService, nd *dag.Node) (*HamtShard, error) {
 func (ds *HamtShard) Node() (*dag.Node, error) {
 	out := new(dag.Node)
 
+	// TODO: optimized 'for each set bit'
 	for i := 0; i < ds.tableSize; i++ {
 		if ds.bitfield.Bit(i) == 0 {
 			continue
