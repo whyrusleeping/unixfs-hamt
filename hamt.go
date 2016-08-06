@@ -91,23 +91,25 @@ func (ds *HamtShard) Node() (*dag.Node, error) {
 
 		cindex := ds.indexForBitPos(i)
 		child := ds.children[cindex]
-		if child == nil {
-			c, err := ds.getChild(context.TODO(), cindex)
+		if child != nil {
+			cnd, err := child.Node()
 			if err != nil {
 				return nil, err
 			}
 
-			child = c
-		}
+			err = out.AddNodeLinkClean(ds.linkNamePrefix(i)+child.Label(), cnd)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			// child unloaded, just copy in link with updated name
+			lnk := ds.nd.Links[cindex]
+			label := lnk.Name[ds.maxpadlen:]
 
-		cnd, err := child.Node()
-		if err != nil {
-			return nil, err
-		}
-
-		err = out.AddNodeLinkClean(ds.linkNamePrefix(i)+child.Label(), cnd)
-		if err != nil {
-			return nil, err
+			err := out.AddRawLink(ds.linkNamePrefix(i)+label, lnk)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 

@@ -14,6 +14,7 @@ import (
 	key "github.com/ipfs/go-ipfs/blocks/key"
 	dag "github.com/ipfs/go-ipfs/merkledag"
 	mdtest "github.com/ipfs/go-ipfs/merkledag/test"
+	dagutils "github.com/ipfs/go-ipfs/merkledag/utils"
 	ft "github.com/ipfs/go-ipfs/unixfs"
 )
 
@@ -141,7 +142,7 @@ func TestDirBuilding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	printDag(ds, nd, 0)
+	//printDag(ds, nd, 0)
 
 	k, err := nd.Key()
 	if err != nil {
@@ -209,6 +210,7 @@ func TestShardReload(t *testing.T) {
 	}
 
 	if outk != ndk {
+		printDiff(ds, nd, ond)
 		t.Fatal("roundtrip serialization failed")
 	}
 }
@@ -499,4 +501,15 @@ func printDag(ds dag.DAGService, nd *dag.Node, depth int) {
 		printDag(ds, ch, depth+1)
 	}
 	fmt.Println(padding + "}")
+}
+
+func printDiff(ds dag.DAGService, a, b *dag.Node) {
+	diff, err := dagutils.Diff(context.TODO(), ds, a, b)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, d := range diff {
+		fmt.Println(d)
+	}
 }
