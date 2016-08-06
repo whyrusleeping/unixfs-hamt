@@ -105,7 +105,7 @@ func (ds *HamtShard) Node() (*dag.Node, error) {
 			return nil, err
 		}
 
-		err = out.AddNodeLinkClean(ds.linkNamePrefix(cindex)+child.Label(), cnd)
+		err = out.AddNodeLinkClean(ds.linkNamePrefix(i)+child.Label(), cnd)
 		if err != nil {
 			return nil, err
 		}
@@ -414,6 +414,7 @@ func (ds *HamtShard) indexForBitPos(bp int) int {
 	return popCount(mask)
 }
 
-func (ds *HamtShard) linkNamePrefix(i int) string {
-	return fmt.Sprintf(ds.prefixPadStr, i)
+// linkNamePrefix takes in the bitfield index of an entry and returns its hex prefix
+func (ds *HamtShard) linkNamePrefix(idx int) string {
+	return fmt.Sprintf(ds.prefixPadStr, idx)
 }

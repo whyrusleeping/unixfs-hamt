@@ -141,14 +141,14 @@ func TestDirBuilding(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	//printDag(ds, nd, 0)
+	printDag(ds, nd, 0)
 
 	k, err := nd.Key()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if k.B58String() != "QmPF1FH8RuW8fQTgL6GUqkkGKpJEkpScnMWfGxaPdegwYS" {
+	if k.B58String() != "QmQkGrUnPFpsmfNSDTBDipP9qygn6H9nx4erz4HuKL3wdE" {
 		t.Fatalf("output didnt match what we expected (got %s)", k.B58String())
 	}
 }
