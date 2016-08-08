@@ -40,7 +40,7 @@ func makeDir(ds dag.DAGService, size int) ([]string, *HamtShard, error) {
 	for i := 0; i < len(dirs); i++ {
 		nd := ft.EmptyDirNode()
 		ds.Add(nd)
-		err := s.Insert(dirs[i], nd)
+		err := s.Insert(context.Background(), dirs[i], nd)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -50,7 +50,7 @@ func makeDir(ds dag.DAGService, size int) ([]string, *HamtShard, error) {
 }
 
 func assertLink(s *HamtShard, name string, found bool) error {
-	_, err := s.Find(name)
+	_, err := s.Find(context.Background(), name)
 	switch err {
 	case os.ErrNotExist:
 		if found {
@@ -118,9 +118,10 @@ func TestBasicInsert(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx := context.Background()
 
 	for _, d := range names {
-		_, err := s.Find(d)
+		_, err := s.Find(ctx, d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -156,6 +157,7 @@ func TestDirBuilding(t *testing.T) {
 func TestShardReload(t *testing.T) {
 	ds := mdtest.Mock()
 	s := NewHamtShard(ds, 256)
+	ctx := context.Background()
 
 	_, s, err := makeDir(ds, 200)
 	if err != nil {
@@ -181,7 +183,7 @@ func TestShardReload(t *testing.T) {
 		t.Fatal("not enough links back")
 	}
 
-	_, err = nds.Find("DIRNAME50")
+	_, err = nds.Find(ctx, "DIRNAME50")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,11 +222,12 @@ func TestRemoveElems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx := context.Background()
 
 	shuffle(time.Now().UnixNano(), dirs)
 
 	for _, d := range dirs {
-		err := s.Remove(d)
+		err := s.Remove(ctx, d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -239,7 +242,7 @@ func TestRemoveElems(t *testing.T) {
 		t.Fatal("shouldnt have any links here")
 	}
 
-	err = s.Remove("doesnt exist")
+	err = s.Remove(ctx, "doesnt exist")
 	if err != os.ErrNotExist {
 		t.Fatal("expected error does not exist")
 	}
@@ -251,6 +254,7 @@ func TestInsertAfterMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx := context.Background()
 
 	nd, err := s.Node()
 	if err != nil {
@@ -264,7 +268,7 @@ func TestInsertAfterMarshal(t *testing.T) {
 
 	empty := ft.EmptyDirNode()
 	for i := 0; i < 100; i++ {
-		err := nds.Insert(fmt.Sprintf("moredirs%d", i), empty)
+		err := nds.Insert(ctx, fmt.Sprintf("moredirs%d", i), empty)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -289,13 +293,14 @@ func TestDuplicateAddShard(t *testing.T) {
 	ds := mdtest.Mock()
 	dir := NewHamtShard(ds, 256)
 	nd := ft.EmptyDirNode()
+	ctx := context.Background()
 
-	err := dir.Insert("test", nd)
+	err := dir.Insert(ctx, "test", nd)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = dir.Insert("test", nd)
+	err = dir.Insert(ctx, "test", nd)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -333,9 +338,10 @@ func TestFindNonExisting(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx := context.Background()
 
 	for i := 0; i < 200; i++ {
-		_, err := s.Find(fmt.Sprintf("notfound%d", i))
+		_, err := s.Find(ctx, fmt.Sprintf("notfound%d", i))
 		if err != os.ErrNotExist {
 			t.Fatal("expected ErrNotExist")
 		}
@@ -348,15 +354,16 @@ func TestRemoveElemsAfterMarshal(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ctx := context.Background()
 
 	sort.Strings(dirs)
 
-	err = s.Remove(dirs[0])
+	err = s.Remove(ctx, dirs[0])
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	out, err := s.Find(dirs[0])
+	out, err := s.Find(ctx, dirs[0])
 	if err == nil {
 		t.Fatal("expected error, got: ", out)
 	}
@@ -371,20 +378,20 @@ func TestRemoveElemsAfterMarshal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, err = nds.Find(dirs[0])
+	_, err = nds.Find(ctx, dirs[0])
 	if err == nil {
 		t.Fatal("expected not to find ", dirs[0])
 	}
 
 	for _, d := range dirs[1:] {
-		_, err := nds.Find(d)
+		_, err := nds.Find(ctx, d)
 		if err != nil {
 			t.Fatal("could not find expected link after unmarshaling")
 		}
 	}
 
 	for _, d := range dirs[1:] {
-		err := nds.Remove(d)
+		err := nds.Remove(ctx, d)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -442,11 +449,12 @@ func TestBitfieldIndexing(t *testing.T) {
 func TestInsertHamtChild(t *testing.T) {
 	ds := mdtest.Mock()
 	s := NewHamtShard(ds, 256)
+	ctx := context.Background()
 
 	e := ft.EmptyDirNode()
 	ds.Add(e)
 
-	err := s.Insert("bar", e)
+	err := s.Insert(ctx, "bar", e)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -461,7 +469,7 @@ func TestInsertHamtChild(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = ns.Insert("foo", snd)
+	err = ns.Insert(ctx, "foo", snd)
 	if err != nil {
 		t.Fatal(err)
 	}

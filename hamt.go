@@ -163,21 +163,21 @@ func (ds *HamtShard) Label() string {
 	return ""
 }
 
-func (ds *HamtShard) Insert(name string, nd *dag.Node) error {
+func (ds *HamtShard) Insert(ctx context.Context, name string, nd *dag.Node) error {
 	hv := &hashBits{b: hash([]byte(name))}
-	return ds.modifyValue(hv, name, nd)
+	return ds.modifyValue(ctx, hv, name, nd)
 }
 
-func (ds *HamtShard) Remove(name string) error {
+func (ds *HamtShard) Remove(ctx context.Context, name string) error {
 	hv := &hashBits{b: hash([]byte(name))}
-	return ds.modifyValue(hv, name, nil)
+	return ds.modifyValue(ctx, hv, name, nil)
 }
 
-func (ds *HamtShard) Find(name string) (*dag.Node, error) {
+func (ds *HamtShard) Find(ctx context.Context, name string) (*dag.Node, error) {
 	hv := &hashBits{b: hash([]byte(name))}
 
 	var out *dag.Node
-	err := ds.getValue(hv, name, func(sv *shardValue) error {
+	err := ds.getValue(ctx, hv, name, func(sv *shardValue) error {
 		out = sv.val
 		return nil
 	})
@@ -258,28 +258,27 @@ func (ds *HamtShard) insertChild(idx int, key string, val *dag.Node) error {
 	return nil
 }
 
-func (ds *HamtShard) rmChild(i int) error {
+func (ds *HamtShard) rmChild(i int) {
 	copy(ds.children[i:], ds.children[i+1:])
 	ds.children = ds.children[:len(ds.children)-1]
 
 	copy(ds.nd.Links[i:], ds.nd.Links[i+1:])
 	ds.nd.Links = ds.nd.Links[:len(ds.nd.Links)-1]
-	return nil
 }
 
-func (ds *HamtShard) getValue(hv *hashBits, key string, cb func(*shardValue) error) error {
+func (ds *HamtShard) getValue(ctx context.Context, hv *hashBits, key string, cb func(*shardValue) error) error {
 	idx := hv.Next(ds.tableSizeLg2)
 	if ds.bitfield.Bit(int(idx)) == 1 {
 		cindex := ds.indexForBitPos(idx)
 
-		child, err := ds.getChild(context.TODO(), cindex)
+		child, err := ds.getChild(ctx, cindex)
 		if err != nil {
 			return err
 		}
 
 		switch child := child.(type) {
 		case *HamtShard:
-			return child.getValue(hv, key, cb)
+			return child.getValue(ctx, hv, key, cb)
 		case *shardValue:
 			if child.key == key {
 				return cb(child)
@@ -343,20 +342,20 @@ func (ds *HamtShard) walkTrie(cb func(*shardValue) error) error {
 	return nil
 }
 
-func (ds *HamtShard) modifyValue(hv *hashBits, key string, val *dag.Node) error {
+func (ds *HamtShard) modifyValue(ctx context.Context, hv *hashBits, key string, val *dag.Node) error {
 	idx := hv.Next(ds.tableSizeLg2)
 
 	if ds.bitfield.Bit(idx) == 1 {
 		cindex := ds.indexForBitPos(idx)
 
-		child, err := ds.getChild(context.TODO(), cindex)
+		child, err := ds.getChild(ctx, cindex)
 		if err != nil {
 			return err
 		}
 
 		switch child := child.(type) {
 		case *HamtShard:
-			err := child.modifyValue(hv, key, val)
+			err := child.modifyValue(ctx, hv, key, val)
 			if err != nil {
 				return err
 			}
@@ -369,7 +368,8 @@ func (ds *HamtShard) modifyValue(hv *hashBits, key string, val *dag.Node) error 
 					//       in the event of another implementation creates flawed
 					//       structures, this will help to normalize them.
 					ds.bitfield.SetBit(ds.bitfield, idx, 0)
-					return ds.rmChild(cindex)
+					ds.rmChild(cindex)
+					return nil
 				case 1:
 					nchild, ok := child.children[0].(*shardValue)
 					if ok {
@@ -383,28 +383,28 @@ func (ds *HamtShard) modifyValue(hv *hashBits, key string, val *dag.Node) error 
 			return nil
 		case *shardValue:
 			switch {
-			// passing a nil value signifies a 'delete'
-			case val == nil:
+			case val == nil: // passing a nil value signifies a 'delete'
 				ds.bitfield.SetBit(ds.bitfield, idx, 0)
-				return ds.rmChild(cindex)
+				ds.rmChild(cindex)
+				return nil
 
-				// value modification
-			case child.key == key:
+			case child.key == key: // value modification
 				child.val = val
 				return nil
-			default:
+
+			default: // replace value with another shard, one level deeper
 				ns := NewHamtShard(ds.dserv, ds.tableSize)
 				chhv := &hashBits{
 					b:        hash([]byte(child.key)),
 					consumed: hv.consumed,
 				}
 
-				err := ns.modifyValue(hv, key, val)
+				err := ns.modifyValue(ctx, hv, key, val)
 				if err != nil {
 					return err
 				}
 
-				err = ns.modifyValue(chhv, child.key, child.val)
+				err = ns.modifyValue(ctx, chhv, child.key, child.val)
 				if err != nil {
 					return err
 				}

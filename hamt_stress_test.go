@@ -13,6 +13,7 @@ import (
 	dag "github.com/ipfs/go-ipfs/merkledag"
 	mdtest "github.com/ipfs/go-ipfs/merkledag/test"
 	ft "github.com/ipfs/go-ipfs/unixfs"
+	"golang.org/x/net/context"
 )
 
 func getNames(prefix string, count int) []string {
@@ -101,15 +102,16 @@ func TestOrderConsistency(t *testing.T) {
 }
 
 func validateOpSetCompletion(t *testing.T, s *HamtShard, keep, temp []string) error {
+	ctx := context.Background()
 	for _, n := range keep {
-		_, err := s.Find(n)
+		_, err := s.Find(ctx, n)
 		if err != nil {
 			return fmt.Errorf("couldnt find %s: %s", n, err)
 		}
 	}
 
 	for _, n := range temp {
-		_, err := s.Find(n)
+		_, err := s.Find(ctx, n)
 		if err != os.ErrNotExist {
 			return fmt.Errorf("expected not to find: %s", err)
 		}
@@ -122,21 +124,22 @@ func executeOpSet(t *testing.T, ds dag.DAGService, ops []testOp) (*HamtShard, er
 	s := NewHamtShard(ds, 256)
 	e := ft.EmptyDirNode()
 	ds.Add(e)
+	ctx := context.Background()
 
 	for _, o := range ops {
 		switch o.Op {
 		case opAdd:
-			err := s.Insert(o.Val, e)
+			err := s.Insert(ctx, o.Val, e)
 			if err != nil {
 				return nil, fmt.Errorf("inserting %s: %s", o.Val, err)
 			}
 		case opDel:
-			err := s.Remove(o.Val)
+			err := s.Remove(ctx, o.Val)
 			if err != nil {
 				return nil, fmt.Errorf("deleting %s: %s", o.Val, err)
 			}
 		case opFind:
-			_, err := s.Find(o.Val)
+			_, err := s.Find(ctx, o.Val)
 			if err != nil {
 				return nil, fmt.Errorf("finding %s: %s", o.Val, err)
 			}
@@ -193,6 +196,7 @@ func debugExecuteOpSet(ds dag.DAGService, ops []testOp) (*HamtShard, error) {
 	s := NewHamtShard(ds, 256)
 	e := ft.EmptyDirNode()
 	ds.Add(e)
+	ctx := context.Background()
 
 	run := 0
 
@@ -213,7 +217,7 @@ mainloop:
 			case "":
 				run = 1
 			case "find":
-				_, err := s.Find(parts[1])
+				_, err := s.Find(ctx, parts[1])
 				if err == nil {
 					fmt.Println("success")
 				} else {
@@ -252,18 +256,18 @@ mainloop:
 
 		switch o.Op {
 		case opAdd:
-			err := s.Insert(o.Val, e)
+			err := s.Insert(ctx, o.Val, e)
 			if err != nil {
 				return nil, fmt.Errorf("inserting %s: %s", o.Val, err)
 			}
 		case opDel:
 			fmt.Println("deleting: ", o.Val)
-			err := s.Remove(o.Val)
+			err := s.Remove(ctx, o.Val)
 			if err != nil {
 				return nil, fmt.Errorf("deleting %s: %s", o.Val, err)
 			}
 		case opFind:
-			_, err := s.Find(o.Val)
+			_, err := s.Find(ctx, o.Val)
 			if err != nil {
 				return nil, fmt.Errorf("finding %s: %s", o.Val, err)
 			}
