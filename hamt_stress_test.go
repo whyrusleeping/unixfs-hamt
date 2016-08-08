@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	dag "github.com/ipfs/go-ipfs/merkledag"
 	mdtest "github.com/ipfs/go-ipfs/merkledag/test"
@@ -41,13 +42,18 @@ func stringArrToSet(arr []string) map[string]bool {
 	return out
 }
 
+// generate two different random sets of operations to result in the same
+// ending directory (same set of entries at the end) and execute each of them
+// in turn, then compare to ensure the output is the same on each.
 func TestOrderConsistency(t *testing.T) {
+	seed := time.Now().UnixNano()
+	t.Logf("using seed = %d", seed)
 	ds := mdtest.Mock()
 
 	keep := getNames("good", 4000)
 	temp := getNames("tempo", 6000)
 
-	ops := genOpSet(keep, temp)
+	ops := genOpSet(seed, keep, temp)
 	s, err := executeOpSet(t, ds, ops)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +64,7 @@ func TestOrderConsistency(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ops2 := genOpSet(keep, temp)
+	ops2 := genOpSet(seed+1000, keep, temp)
 	s2, err := executeOpSet(t, ds, ops2)
 	if err != nil {
 		t.Fatal(err)
@@ -140,11 +146,11 @@ func executeOpSet(t *testing.T, ds dag.DAGService, ops []testOp) (*HamtShard, er
 	return s, nil
 }
 
-func genOpSet(keep, temp []string) []testOp {
+func genOpSet(seed int64, keep, temp []string) []testOp {
 	tempset := stringArrToSet(temp)
 
 	allnames := append(keep, temp...)
-	shuffle(allnames)
+	shuffle(seed, allnames)
 
 	var todel []string
 
@@ -170,7 +176,7 @@ func genOpSet(keep, temp []string) []testOp {
 				todel = append(todel, next)
 			}
 		} else {
-			//shuffle(todel)
+			shuffle(seed+100, todel)
 			next := todel[0]
 			todel = todel[1:]
 

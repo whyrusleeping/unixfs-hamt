@@ -187,43 +187,44 @@ func (ds *HamtShard) Find(name string) (*dag.Node, error) {
 
 func (ds *HamtShard) getChild(ctx context.Context, i int) (child, error) {
 	c := ds.children[i]
-	if c == nil {
-		lnk := ds.nd.Links[i]
-		nd, err := lnk.GetNode(ctx, ds.dserv)
-		if err != nil {
-			return nil, err
-		}
-
-		if len(lnk.Name) < ds.maxpadlen {
-			return nil, fmt.Errorf("invalid link name '%s'", lnk.Name)
-		}
-
-		pbd, err := format.FromBytes(nd.Data())
-		if err != nil {
-			return nil, err
-		}
-
-		if len(lnk.Name) == ds.maxpadlen {
-			if pbd.GetType() != format.THAMTShard {
-				return nil, fmt.Errorf("HAMT entries must have non-zero length name")
-			}
-
-			cds, err := NewHamtFromDag(ds.dserv, nd)
-			if err != nil {
-				return nil, err
-			}
-
-			c = cds
-		} else {
-			c = &shardValue{
-				key: lnk.Name[ds.maxpadlen:],
-				val: nd,
-			}
-		}
-
-		ds.children[i] = c
+	if c != nil {
+		return c, nil
 	}
 
+	lnk := ds.nd.Links[i]
+	if len(lnk.Name) < ds.maxpadlen {
+		return nil, fmt.Errorf("invalid link name '%s'", lnk.Name)
+	}
+
+	nd, err := lnk.GetNode(ctx, ds.dserv)
+	if err != nil {
+		return nil, err
+	}
+
+	pbd, err := format.FromBytes(nd.Data())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(lnk.Name) == ds.maxpadlen {
+		if pbd.GetType() != format.THAMTShard {
+			return nil, fmt.Errorf("HAMT entries must have non-zero length name")
+		}
+
+		cds, err := NewHamtFromDag(ds.dserv, nd)
+		if err != nil {
+			return nil, err
+		}
+
+		c = cds
+	} else {
+		c = &shardValue{
+			key: lnk.Name[ds.maxpadlen:],
+			val: nd,
+		}
+	}
+
+	ds.children[i] = c
 	return c, nil
 }
 

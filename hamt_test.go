@@ -18,8 +18,8 @@ import (
 	ft "github.com/ipfs/go-ipfs/unixfs"
 )
 
-func shuffle(arr []string) {
-	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+func shuffle(seed int64, arr []string) {
+	r := rand.New(rand.NewSource(seed))
 	for i := 0; i < len(arr); i++ {
 		a := r.Intn(len(arr))
 		b := r.Intn(len(arr))
@@ -35,8 +35,7 @@ func makeDir(ds dag.DAGService, size int) ([]string, *HamtShard, error) {
 		dirs = append(dirs, fmt.Sprintf("DIRNAME%d", i))
 	}
 
-	rand.Seed(time.Now().UnixNano())
-	shuffle(dirs)
+	shuffle(time.Now().UnixNano(), dirs)
 
 	for i := 0; i < len(dirs); i++ {
 		nd := ft.EmptyDirNode()
@@ -222,7 +221,7 @@ func TestRemoveElems(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	shuffle(dirs)
+	shuffle(time.Now().UnixNano(), dirs)
 
 	for _, d := range dirs {
 		err := s.Remove(d)
