@@ -186,6 +186,15 @@ func (ds *HamtShard) Find(name string) (*dag.Node, error) {
 }
 
 func (ds *HamtShard) getChild(ctx context.Context, i int) (child, error) {
+	if i >= len(ds.children) || i < 0 {
+		return nil, fmt.Errorf("invalid index passed to getChild (likely corrupt bitfield)")
+	}
+
+	if len(ds.children) != len(ds.nd.Links) {
+		panic("no")
+		return nil, fmt.Errorf("inconsistent lengths between children array and Links array")
+	}
+
 	c := ds.children[i]
 	if c != nil {
 		return c, nil
@@ -253,10 +262,8 @@ func (ds *HamtShard) rmChild(i int) error {
 	copy(ds.children[i:], ds.children[i+1:])
 	ds.children = ds.children[:len(ds.children)-1]
 
-	lnk := ds.nd.Links[i]
-	if lnk != nil {
-		return ds.nd.RemoveNodeLink(lnk.Name)
-	}
+	copy(ds.nd.Links[i:], ds.nd.Links[i+1:])
+	ds.nd.Links = ds.nd.Links[:len(ds.nd.Links)-1]
 	return nil
 }
 
